@@ -1,10 +1,11 @@
 import assert from 'assert';
-import { join, relative } from 'path';
+import { join, relative, extname } from 'path';
 import { existsSync, readFileSync } from 'fs';
-import isPlainObject from 'is-plain-object';
+import { isPlainObject } from 'lodash';
 import ejs from 'ejs';
 import { minify } from 'html-minifier';
 import { matchRoutes } from 'react-router-config';
+import cheerio from 'cheerio';
 import formatChunksMap from './formatChunksMap';
 
 export default class HTMLGenerator {
@@ -20,16 +21,12 @@ export default class HTMLGenerator {
       this.env = process.env.NODE_ENV;
     }
     if (!('minify' in this)) {
-      this.minify =
-        this.env === 'production' && process.env.COMPRESS !== 'none';
+      this.minify = this.env === 'production' && process.env.COMPRESS !== 'none';
     }
   }
 
   generate() {
-    assert(
-      this.env === 'production',
-      `HtmlGenerator.generate() should only be used in umi build`,
-    );
+    assert(this.env === 'production', `HtmlGenerator.generate() should only be used in umi build`);
 
     const flatRoutes = this.getFlatRoutes(this.routes);
     assert(flatRoutes.length, 'no valid routes found');
@@ -52,9 +49,7 @@ export default class HTMLGenerator {
   getFlatRoutes(routes) {
     return routes.reduce((memo, route) => {
       if (route.routes) {
-        return memo
-          .concat(this.routeWithoutRoutes(route))
-          .concat(this.getFlatRoutes(route.routes));
+        return memo.concat(this.routeWithoutRoutes(route)).concat(this.getFlatRoutes(route.routes));
       } else {
         if (route.path) {
           memo.push(route);
@@ -66,8 +61,7 @@ export default class HTMLGenerator {
 
   getHtmlPath(path) {
     const { exportStatic } = this.config;
-    const htmlSuffix =
-      exportStatic && isPlainObject(exportStatic) && exportStatic.htmlSuffix;
+    const htmlSuffix = exportStatic && isPlainObject(exportStatic) && exportStatic.htmlSuffix;
 
     if (path === '/') {
       return 'index.html';
@@ -187,16 +181,14 @@ export default class HTMLGenerator {
   }
 
   getHashedFileName(filename) {
-    const isProduction = this.env === 'production';
-    if (isProduction) {
+    // css is optional
+    if (extname(filename) === '.js') {
       assert(
         this.chunksMap[filename],
-        `file ${filename} don't exists in chunksMap`,
+        `file ${filename} don't exists in chunksMap ${JSON.stringify(this.chunksMap)}`,
       );
-      return this.chunksMap[filename];
-    } else {
-      return filename;
     }
+    return this.chunksMap[filename];
   }
 
   getContent(route) {
@@ -206,10 +198,11 @@ export default class HTMLGenerator {
     let context = {
       route,
       config: this.config,
+      publicPath: this.publicPath,
       ...(this.config.context || {}),
       env: this.env,
     };
-    if (this.modifyContext) context = this.modifyContext(context, route);
+    if (this.modifyContext) context = this.modifyContext(context, { route });
 
     const tplPath = this.getDocumentTplPath(route);
     const relTplPath = relative(cwd, tplPath);
@@ -230,11 +223,10 @@ export default class HTMLGenerator {
     });
 
     // validate tpl
+    const $ = cheerio.load(html);
     assert(
-      html.includes(`<div id="${this.config.mountElementId}"></div>`),
-      `Document ${relTplPath} must contain <div id="${
-        this.config.mountElementId
-      }"></div>`,
+      $(`#${this.config.mountElementId}`).length === 1,
+      `Document ${relTplPath} must contain <div id="${this.config.mountElementId}"></div>`,
     );
 
     let metas = [];
@@ -242,16 +234,21 @@ export default class HTMLGenerator {
     let scripts = [];
     let styles = [];
     let headScripts = [];
+    let chunks = ['umi'];
+
+    if (this.modifyChunks) chunks = this.modifyChunks(chunks, { route });
+    chunks = chunks.map(chunk => {
+      return isPlainObject(chunk) ? chunk : { name: chunk };
+    });
 
     let routerBaseStr = JSON.stringify(this.config.base || '/');
     const publicPath = this.publicPath || '/';
     let publicPathStr = JSON.stringify(publicPath);
 
     if (exportStatic && exportStatic.dynamicRoot) {
-      routerBaseStr = `location.pathname.split('/').slice(0, -${route.path.split(
-        '/',
-      ).length - 1}).concat('').join('/')`;
-      publicPathStr = 'location.origin + window.routerBase';
+      routerBaseStr = `location.pathname.split('/').slice(0, -${route.path.split('/').length -
+        1}).concat('').join('/')`;
+      publicPathStr = `location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase`;
     }
 
     if (this.modifyRouterBaseStr) {
@@ -261,42 +258,60 @@ export default class HTMLGenerator {
       publicPathStr = this.modifyPublicPathStr(publicPathStr);
     }
 
-    const setPublicPath =
-      runtimePublicPath || (exportStatic && exportStatic.dynamicRoot);
+    const setPublicPath = runtimePublicPath || (exportStatic && exportStatic.dynamicRoot);
     headScripts.push({
       content: [
         `window.routerBase = ${routerBaseStr};`,
         ...(setPublicPath ? [`window.publicPath = ${publicPathStr};`] : []),
       ].join('\n'),
     });
-    scripts.push({
-      src: `<%= pathToPublicPath %>${this.getHashedFileName('umi.js')}`,
+
+    const getChunkPath = fileName => {
+      const hashedFileName = this.getHashedFileName(fileName);
+      if (hashedFileName) {
+        return `__PATH_TO_PUBLIC_PATH__${hashedFileName}`;
+      } else {
+        return null;
+      }
+    };
+
+    chunks.forEach(({ name, headScript }) => {
+      const chunkPath = getChunkPath(`${name}.js`);
+      if (chunkPath) {
+        (headScript ? headScripts : scripts).push({
+          src: chunkPath,
+        });
+      }
     });
 
-    if (this.modifyMetas) metas = this.modifyMetas(metas);
-    if (this.modifyLinks) links = this.modifyLinks(links);
-    if (this.modifyScripts) scripts = this.modifyScripts(scripts);
-    if (this.modifyStyles) styles = this.modifyStyles(styles);
-    if (this.modifyHeadScripts)
-      headScripts = this.modifyHeadScripts(headScripts);
-
-    if (this.env === 'development' || this.chunksMap['umi.css']) {
-      // umi.css should be the last one stylesheet
-      links.push({
-        rel: 'stylesheet',
-        href: `<%= pathToPublicPath %>${this.getHashedFileName('umi.css')}`,
-      });
+    if (this.modifyMetas) metas = this.modifyMetas(metas, { route });
+    if (this.modifyLinks) links = this.modifyLinks(links, { route });
+    if (this.modifyScripts) scripts = this.modifyScripts(scripts, { route });
+    if (this.modifyStyles) styles = this.modifyStyles(styles, { route });
+    if (this.modifyHeadScripts) {
+      headScripts = this.modifyHeadScripts(headScripts, { route });
     }
+
+    // umi.css should be the last stylesheet
+    chunks.forEach(({ name }) => {
+      const chunkPath = getChunkPath(`${name}.css`);
+      if (chunkPath) {
+        links.push({
+          rel: 'stylesheet',
+          href: chunkPath,
+        });
+      }
+    });
 
     // insert tags
     html = html.replace(
       '<head>',
-      `
+      `${`
 <head>
 ${metas.length ? this.getMetasContent(metas) : ''}
 ${links.length ? this.getLinksContent(links) : ''}
 ${styles.length ? this.getStylesContent(styles) : ''}
-    `.trim() + '\n',
+    `.trim()}\n`,
     );
     html = html.replace(
       '</head>',
@@ -315,14 +330,18 @@ ${scripts.length ? this.getScriptsContent(scripts) : ''}
 
     const relPathToPublicPath = this.getRelPathToPublicPath(route.path);
     const pathToPublicPath =
-      exportStatic && exportStatic.dynamicRoot
-        ? relPathToPublicPath
-        : publicPath;
-    html = html.replace(/<%= pathToPublicPath %>/g, pathToPublicPath);
+      exportStatic && exportStatic.dynamicRoot ? relPathToPublicPath : publicPath;
+
+    html = html
+      .replace(/__PATH_TO_PUBLIC_PATH__/g, pathToPublicPath)
+      .replace(/<%= PUBLIC_PATH %>/g, pathToPublicPath);
 
     if (this.modifyHTML) {
-      html = this.modifyHTML(html, { route });
+      html = this.modifyHTML(html, { route, getChunkPath });
     }
+
+    // Since this.modifyHTML will produce new __PATH_TO_PUBLIC_PATH__
+    html = html.replace(/__PATH_TO_PUBLIC_PATH__/g, pathToPublicPath);
 
     if (this.minify) {
       html = minify(html, {

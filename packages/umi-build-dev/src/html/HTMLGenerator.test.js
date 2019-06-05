@@ -86,9 +86,7 @@ describe('HG', () => {
 
   it('getStylesContent', () => {
     const hg = new HTMLGenerator();
-    const result = hg.getStylesContent([
-      { content: 'body { color: red; }', a: 'b' },
-    ]);
+    const result = hg.getStylesContent([{ content: 'body { color: red; }', a: 'b' }]);
     expect(result).toEqual(
       `
 <style a="b">
@@ -142,6 +140,91 @@ describe('HG', () => {
     );
   });
 
+  it('getContent with chunks', () => {
+    const hg = new HTMLGenerator({
+      env: 'production',
+      chunksMap: {
+        umi: ['umi.js', 'umi.css'],
+        a: ['a.js'],
+        b: ['b.js', 'b.css'],
+        c: ['c.js', 'c.css'],
+      },
+      minify: false,
+      config: {
+        mountElementId: 'documenttestid',
+      },
+      paths: {
+        cwd: '/a',
+        absPageDocumentPath: '/tmp/files-not-exists',
+        defaultDocumentPath: join(__dirname, 'fixtures/document.ejs'),
+      },
+      modifyChunks() {
+        return ['a', { name: 'b', headScript: true }, 'umi', 'c'];
+      },
+    });
+    const content = hg.getContent({
+      path: '/',
+    });
+    expect(content.trim()).toEqual(
+      `
+<head>
+
+<link rel="stylesheet" href="/b.css" />
+<link rel="stylesheet" href="/umi.css" />
+<link rel="stylesheet" href="/c.css" />
+<script>
+  window.routerBase = "/";
+</script>
+<script src="/b.js"></script>
+</head>
+<body>
+<div id="documenttestid"></div>
+<script src="/a.js"></script>
+<script src="/umi.js"></script>
+<script src="/c.js"></script>
+</body>
+    `.trim(),
+    );
+  });
+
+  it('getContent with publicPath', () => {
+    const hg = new HTMLGenerator({
+      env: 'production',
+      chunksMap: {
+        umi: ['umi.js', 'umi.css'],
+      },
+      minify: false,
+      publicPath: '/foo/',
+      config: {
+        mountElementId: 'documenttestid',
+      },
+      paths: {
+        cwd: '/a',
+        absPageDocumentPath: '/tmp/files-not-exists',
+        defaultDocumentPath: join(__dirname, 'fixtures/document-with-publicPath.ejs'),
+      },
+    });
+    const content = hg.getContent({
+      path: '/',
+    });
+    expect(content.trim()).toEqual(
+      `
+<head>
+
+<link rel="stylesheet" href="/foo/umi.css" />
+<script>
+  window.routerBase = "/";
+</script>
+</head>
+<body>
+<img src="/foo/a.jpg" />
+<div id="documenttestid"></div>
+<script src="/foo/umi.js"></script>
+</body>
+    `.trim(),
+    );
+  });
+
   it('getContent with runtimePublicPath', () => {
     const hg = new HTMLGenerator({
       env: 'production',
@@ -183,6 +266,9 @@ describe('HG', () => {
   it('getContent in development', () => {
     const hg = new HTMLGenerator({
       env: 'development',
+      chunksMap: {
+        umi: ['umi.js', 'umi.css'],
+      },
       config: {
         mountElementId: 'documenttestid',
       },
@@ -268,7 +354,7 @@ describe('HG', () => {
 <link rel="stylesheet" href="./umi.css" />
 <script>
   window.routerBase = location.pathname.split('/').slice(0, -1).concat('').join('/');
-  window.publicPath = location.origin + window.routerBase;
+  window.publicPath = location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase;
 </script>
 </head>
 <body>
@@ -281,15 +367,11 @@ describe('HG', () => {
     const c2 = hg.getContent({
       path: '/a',
     });
-    expect(c2.includes('"../umi.js"') && c2.includes('"../umi.css"')).toEqual(
-      true,
-    );
+    expect(c2.includes('"../umi.js"') && c2.includes('"../umi.css"')).toEqual(true);
     const c3 = hg.getContent({
       path: '/a/b',
     });
-    expect(
-      c3.includes('"../../umi.js"') && c3.includes('"../../umi.css"'),
-    ).toEqual(true);
+    expect(c3.includes('"../../umi.js"') && c3.includes('"../../umi.css"')).toEqual(true);
   });
 
   it('getRoute dynamicRoot with exportStatic.htmlSuffix = true', () => {
@@ -323,7 +405,7 @@ describe('HG', () => {
 <link rel="stylesheet" href="./umi.css" />
 <script>
   window.routerBase = location.pathname.split('/').slice(0, -1).concat('').join('/');
-  window.publicPath = location.origin + window.routerBase;
+  window.publicPath = location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase;
 </script>
 </head>
 <body>
@@ -336,15 +418,11 @@ describe('HG', () => {
     const c2 = hg.getContent({
       path: '/a',
     });
-    expect(c2.includes('"./umi.js"') && c2.includes('"./umi.css"')).toEqual(
-      true,
-    );
+    expect(c2.includes('"./umi.js"') && c2.includes('"./umi.css"')).toEqual(true);
     const c3 = hg.getContent({
       path: '/a/b',
     });
-    expect(c3.includes('"../umi.js"') && c3.includes('"../umi.css"')).toEqual(
-      true,
-    );
+    expect(c3.includes('"../umi.js"') && c3.includes('"../umi.css"')).toEqual(true);
   });
 
   it('getMatchedContent', () => {
@@ -414,21 +492,13 @@ describe('HG', () => {
     });
 
     const c1 = hg.getMatchedContent('/a');
-    expect(c1.includes('"./umi.js"') && c1.includes('"./umi.css"')).toEqual(
-      true,
-    );
+    expect(c1.includes('"./umi.js"') && c1.includes('"./umi.css"')).toEqual(true);
     const c2 = hg.getMatchedContent('/b/c');
-    expect(c2.includes('"../umi.js"') && c2.includes('"../umi.css"')).toEqual(
-      true,
-    );
+    expect(c2.includes('"../umi.js"') && c2.includes('"../umi.css"')).toEqual(true);
     const c3 = hg.getMatchedContent('/c');
-    expect(c3.includes('"./umi.js"') && c3.includes('"./umi.css"')).toEqual(
-      true,
-    );
+    expect(c3.includes('"./umi.js"') && c3.includes('"./umi.css"')).toEqual(true);
     const c4 = hg.getMatchedContent('/e/123');
-    expect(c4.includes('"../umi.js"') && c4.includes('"../umi.css"')).toEqual(
-      true,
-    );
+    expect(c4.includes('"../umi.js"') && c4.includes('"../umi.css"')).toEqual(true);
   });
 
   it('getMatchedContent with exportStatic and context', () => {
@@ -445,10 +515,7 @@ describe('HG', () => {
       paths: {
         cwd: '/a',
         absPageDocumentPath: '/tmp/files-not-exists',
-        defaultDocumentPath: join(
-          __dirname,
-          'fixtures/custom-doc-with-context.ejs',
-        ),
+        defaultDocumentPath: join(__dirname, 'fixtures/custom-doc-with-context.ejs'),
       },
       routes: [
         { path: '/a' },
@@ -462,7 +529,7 @@ describe('HG', () => {
           ],
         },
       ],
-      modifyContext: (context, route) => {
+      modifyContext: (context, { route }) => {
         return {
           ...context,
           path: route.path,
@@ -477,5 +544,31 @@ describe('HG', () => {
     const c2 = hg.getMatchedContent('/b/c');
     expect(c2.includes('"/umi.js"') && c2.includes('"/umi.css"')).toEqual(true);
     expect(c2.includes('<title>bctitle-/b/c</title>')).toEqual(true);
+  });
+
+  it('get content with default document when title is undefined', () => {
+    const hg = new HTMLGenerator({
+      env: 'production',
+      minify: false,
+      config: {
+        mountElementId: 'root',
+      },
+      chunksMap: {
+        umi: ['umi.js', 'umi.css'],
+      },
+      paths: {
+        cwd: '/a',
+        absPageDocumentPath: '/tmp/files-not-exists',
+        defaultDocumentPath: join(__dirname, '../../template/document.ejs'),
+      },
+      routes: [{ path: '/a' }],
+      modifyContext: context => {
+        return context;
+      },
+    });
+
+    const c1 = hg.getMatchedContent('/a');
+    expect(c1.includes('"/umi.js"') && c1.includes('"/umi.css"')).toEqual(true);
+    expect(c1.includes('<title>')).toEqual(false);
   });
 });

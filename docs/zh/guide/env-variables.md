@@ -43,6 +43,10 @@ $ PORT=8001 umi dev
 
 默认是 `0.0.0.0`。
 
+### ESLINT <Badge text="2.4.0+"/>
+
+有值时在 dev 和 build 命令里会通过 [eslint-config-umi](https://github.com/umijs/umi/tree/master/packages/eslint-config-umi) 做基础的 eslint 校验，避免一些低级错误。
+
 ### APP_ROOT
 
 ::: warning
@@ -63,9 +67,29 @@ $ APP_ROOT=src/renderer umi dev
 $ ANALYZE=1 umi build
 ```
 
+### SPEED_MEASURE
+
+默认关闭。分析各个 plugin 和 loader 的耗时。比如：
+
+```bash
+# 将分析信息在控制台输出
+$ SPEED_MEASURE=CONSOLE umi build
+
+# 将分析信息保存到 node_modules/speed-measure.json
+$ SPEED_MEASURE=JSON umi build
+```
+
 ### ANALYZE_PORT
 
 ANALYZE 服务器端口，默认 8888。
+
+### BABEL_POLYFILL <Badge text="2.2.0+"/>
+
+默认引入 `@babel/polyfill`，值为 none 时不引入。比如：
+
+```bash
+$ BABEL_POLYFILL=none umi build
+```
 
 ### COMPRESS
 
@@ -126,3 +150,10 @@ $ HTML=none umi build
 ### WATCH_FILES
 
 ### RM_TMPDIR
+
+### FORK_TS_CHECKER
+默认不开启TypeScript检查，值为1时启用。比如：
+
+```bash
+$ FORK_TS_CHECKER=1 umi dev
+```

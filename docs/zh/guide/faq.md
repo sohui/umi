@@ -59,7 +59,7 @@ e.g.
 
 <img src="https://gw.alipayobjects.com/zos/rmsportal/mTaaEfxKkkGAQicDOSeb.png" />
 
-升级 node 版本，并确保版本是 8 或以上。
+升级 node 版本，并确保版本是 8.10 或以上。
 
 ### `exports is not defined`
 
@@ -93,8 +93,36 @@ e.g.
 
 需配置 NODE_PATH 环境变量，如使用 yarn，可通过执行 `yarn global bin` 拿到 bin 路径。
 
+## webpack
+
+### 如何配置额外的 loader ?
+
+比如 svg 我希望不走 base64，而是全部产生 svg 文件，可以这样配：
+
+```js
+export default {
+  // 添加 url-loader 的 exclude
+  urlLoaderExcludes: [/.svg$/],
+  // 添加 loader
+  chainWebpack(config) {
+    config.module.rule('svg-with-file')
+      .test(/.svg$/)
+      .use('svg-with-file-loader')
+      .loader('file-loader')
+  },
+}
+```
 
 ## CSS
+
+### 为啥我 import 的 css 文件不生效？
+
+umi 默认是开启 css modules 的，请按照 css modules 的方式进行书写。
+
+参考：
+
+* [css-modules/css-modules](https://github.com/css-modules/css-modules)
+* [CSS Modules 用法教程](http://www.ruanyifeng.com/blog/2016/06/css_modules.html)
 
 ### 如何禁用 css modules ？
 
@@ -128,7 +156,7 @@ $ npm i node-sass sass-loader --save
 
 ### 如何断点调试
 
-确保 node 在 8 以上，然后执行：
+确保 node 在 8.10 以上，然后执行：
 
 ```bash
 $ node --inspect-brk ./node_modules/.bin/umi test

@@ -4,94 +4,191 @@ sidebarDepth: 2
 
 # Configuration
 
-::: warning
-This article has not been translated yet. Wan't to help us out? Click the `Edit this page on GitHub` at the end of the page.
-:::
-
 ## Basic
 
 ### plugins
 
-* 类型：`Array`
-* 默认值：`[]`
+* Type: `Array`
+* Default: `[]`
 
-指定插件。
+Specify the plugins.
 
-比如：
+The array item is the path to the plugin and can be an npm dependency, a relative path, or an absolute path. If it is a relative path, it will be resolved from the project root directory. such as:
 
 ```js
 export default {
   plugins: [
+    // npm dependency
     'umi-plugin-react',
-    // 插件有参数时为数组，数组的第二项是参数，类似 babel 插件
+    // relative path
+    './plugin',
+    // absolute path
+    `${__dirname}/plugin.js`,
+  ],
+};
+```
+
+If the plugin has parameters, it is configured as an array. The first item is the path and the second item is the parameter, similar to how the babel plugin is configured. such as:
+
+```js
+export default {
+  plugins: [
+    // 有参数
     ['umi-plugin-react', {
       dva: true,
+      antd: true,
     }],
+    './plugin',
   ],
 };
 ```
 
 ### routes
 
-* 类型：`Array`
-* 默认值：`null`
+* Type: `Array`
+* Default: `null`
 
-配置路由。
+Configure routing.
 
-::: tip 提醒
-如果配置了 `routes`，则约定式路由会不生效。
-:::
+Umi's routing is based on [react-router](https://reacttraining.com/react-router/web/guides/quick-start), and the configuration is basically the same as react-router@4. Checkout [Routing Configuration](../guide/router.html) chapter for details.
+
+```js
+export default {
+  routes: [
+    {
+      path: '/',
+      component: '../layouts/index',
+      routes: [
+        { path: '/user', redirect: '/user/login' },
+        { path: '/user/login', redirect: './user/login' },
+      ],
+    },
+  ],
+};
+```
+
+Notice:
+
+1. The component file is resolved from the `src/pages` directory.
+2. If `routes` is configured, then the configuration route will be used first, and the convension route will not take effect.
+
+### disableRedirectHoist
+
+* Type:`Boolean`
+* Default: `false`
+
+For some reason, we hoist all redirect when parsing the route config, but this caused some problems, so add this configuration to disable redirect hoist.
+
+```js
+export default {
+  disableRedirectHoist: true,
+};
+```
 
 ### history
 
-* 类型：`String`
-* 默认值：`browser`
+* Type: `String | [String, Object]`
+* Default: `browser`
 
-如需切换 history 方式为 hash（默认是 browser history），配置 `history: 'hash'`。
+Specify the history type, including `browser`, `hash` and `memory`.
+
+e.g.
+
+```js
+export default {
+  history: 'hash',
+};
+```
 
 ### outputPath
 
-* 类型：`String`
-* 默认值：`./dist`
+* Type: `String`
+* Default: `./dist`
 
-指定输出路径。
+Specifies the output path.
 
 ### base
 
-* 类型：`String`
-* 默认值：`/`
+* Type: `String`
+* Default: `/`
 
-指定 react-router 的 base，部署到非根目录时需要配置。
+Specify the base of the react-router to be configured when deploying to a non-root directory.
 
 ### publicPath
 
-* 类型：`String`
-* 默认值：`/`
+* Type: `String`
+* Default: `/`
 
-指定 webpack 的 publicPath，指向静态资源文件所在的路径。
+Specifies the publicPath of the webpack, pointing to the path where the static resource file is located.
 
 ### runtimePublicPath
 
-* 类型：`Boolean`
-* 默认值：`false`
+* Type: `Boolean`
+* Default: `false`
 
-值为 `true` 时使用 HTML 里指定的 `window.publicPath`。
+Use the `window.publicPath` specified in the HTML when the value is `true`.
+
+### cssPublicPath <Badge text="2.2.5+"/>
+
+* Type: `String`
+* Default: same as `publicPath`
+
+Specify an extra publicPath for CSS.
+
+### mountElementId
+
+* Type: `String`
+* Default: `root`
+
+Specifies the mount point id which the react app will mount to.
+
+### minimizer
+
+* Type: `String`
+* Default: `uglifyjs`
+* Options: `uglifyjs|terserjs`
+
+Which minimizer to use. UglifyJS does not support es6 while [terser](https://github.com/terser-js/terser) does.
+
+### hash
+
+* Type: `Boolean`
+* Default: `false`
+
+Whether to enable the hash file suffix.
+
+### targets <Badge text="2.1.0+"/>
+
+* Type: `Object`
+* Default: `{ chrome: 49, firefox: 45, safari: 10, edge: 13, ios: 10 }`
+
+Configuring the minimum version of browsers you want to compatible with, umi will automatically introduce polyfill and transform grammar. Configuration items will be merged to default values, so there is no need to give any duplicate configuration.
+
+e.g. Compatible with ie 11,
+
+```js
+export default {
+  targets: {
+    ie: 11,
+  },
+};
+```
 
 ### context
 
-* 类型：`Object`
-* 默认值：`{}`
+* Type: `Object`
+* Default: `{}`
 
-配置全局 context，会覆盖到每个 pages 里的 context。
+Configuring a global context will override the context in each page.
 
 ### exportStatic
 
-* 类型：`Boolean | Object`
-* 默认值：`false`
+* Type: `Boolean | Object`
+* Default: `false`
 
-如果设为 `true` 或 `Object`，则导出全部路由为静态页面，否则默认只输出一个 index.html。
+If set to `true` or `Object`, all routes are exported as static pages, otherwise only one index.html is output by default.
 
-比如：
+such as:
 
 ```
 "exportStatic": {}
@@ -99,51 +196,84 @@ export default {
 
 ### exportStatic.htmlSuffix
 
-* 类型：`Boolean`
-* 默认值：`false`
+* Type: `Boolean`
+* Default: `false`
 
-启用 `.html` 后缀。
+Enable the `.html` suffix.
 
 ### exportStatic.dynamicRoot
 
-* 类型：`Boolean`
-* 默认值：`false`
+* Type: `Boolean`
+* Default: `false`
 
-部署到任意路径。
+Deploy to any path.
 
 ### singular
 
-* 类型：`Boolean`
-* 默认值：`false`
+* Type: `Boolean`
+* Default: `false`
 
-如果设为 `true`，启用单数模式的目录。
+If set to `true`, enable the directory for singular mode.
 
 * src/layout/index.js
 * src/page
-* model（如果有开启 umi-plugin-dva 插件的话）
+* model (if umi-plugin-dva plugin is enabled)
+
+### mock.exclude <Badge text="2.4.5+"/>
+
+- Type: `Array` of `String`
+- Default: `[]`
+
+Exclude files that are not mock files in the `mock` directory.
+
+e.g. exclue all files and directorys starts with `_`,
+
+```js
+export default {
+  mock: {
+    exclude: [
+      'mock/**/_*.js',
+      'mock/_*/**/*.js',
+    ],
+  }
+}
+```
+
+### block <Badge text="2.7.0+"/>
+
+- Type: `Object`
+- Default: `{ defaultGitUrl: "https://github.com/umijs/umi-blocks" }`
+
+```js
+export default {
+  block: {
+    defaultGitUrl: "https://github.com/ant-design/pro-blocks",
+    npmClient: "cnpm",
+  }
+}
+```
 
 ## webpack
 
 ### chainWebpack
 
-通过 [webpack-chain](https://github.com/mozilla-neutrino/webpack-chain) 的 API 扩展或修改 webpack 配置。
+Extend or modify the webpack configuration via the API of [webpack-chain](https://github.com/mozilla-neutrino/webpack-chain).
 
-比如：
+such as:
 
 ```js
 chainWebpack(config, { webpack }) {
-  // 设置 alias
+  // Set alias
   config.resolve.alias.set('a', 'path/to/a');
   
-  // 删除进度条插件
+  // Delete progress bar plugin
   config.plugins.delete('progress');
 }
 ```
-
 ### theme
 
-配置主题，实际上是配 less 变量。支持对象和字符串两种类型，字符串需要指向一个返回配置的文件。
-比如：
+The configuration theme is actually equipped with the less variable. Support for both object and string types, the string needs to point to a file that returns the configuration.
+such as:
 
 ```
 "theme": {
@@ -151,16 +281,33 @@ chainWebpack(config, { webpack }) {
 }
 ```
 
-或者，
+or,
 
 ```
 "theme": "./theme-config.js"
 ```
 
+### treeShaking <Badge text="2.4.0+"/>
+
+- Type: `Boolean`
+- Default: `false`
+
+Configure whether to enable treeShaking, which is off by default.
+
+e.g.
+
+```js
+export default {
+  treeShaking: true,
+};
+```
+
+For example, after [ant-design-pro opens tree-shaking](https://github.com/ant-design/ant-design-pro/pull/3350), the size after gzip can be reduced by 10K.
+
 ### define
 
-通过 webpack 的 DefinePlugin 传递给代码，值会自动做 `JSON.stringify` 处理。
-比如：
+Passed to the code via the webpack's DefinePlugin , the value is automatically handled by `JSON.stringify`.
+such as:
 
 ```js
 "define": {
@@ -171,11 +318,11 @@ chainWebpack(config, { webpack }) {
 
 ### externals
 
-配置 webpack 的?[externals](https://webpack.js.org/configuration/externals/)?属性。
-比如：
+Configure the [externals](https://webpack.js.org/configuration/externals/) property of webpack.
+such as:
 
 ```js
-// 配置 react 和 react-dom 不打入代码
+// Configure react and react-dom do not enter the code
 "externals": {
   "react": "window.React",
   "react-dom": "window.ReactDOM"
@@ -184,57 +331,72 @@ chainWebpack(config, { webpack }) {
 
 ### alias
 
-配置 webpack 的 [resolve.alias](https://webpack.js.org/configuration/resolve/#resolve-alias) 属性。
+Configure the [resolve.alias](https://webpack.js.org/configuration/resolve/#resolve-alias) property of webpack.
 
-### browserslist
+### devServer
 
-配置 [browserslist](https://github.com/ai/browserslist)，同时作用于 babel-preset-env 和 autoprefixer。
-比如：
-
-```js
-"browserslist": [
-  "> 1%",
-  "last 2 versions"
-]
-```
+Configure the [devServer](https://webpack.js.org/configuration/resolve/#devserver) property of webpack.
 
 ### devtool
 
-配置 webpack 的 [devtool](https://webpack.js.org/configuration/devtool/) 属性。
+Configure the [devtool](https://webpack.js.org/configuration/devtool/) property of webpack.
 
 ### disableCSSModules
 
-禁用 [CSS Modules](https://github.com/css-modules/css-modules)。
+Disable [CSS Modules](https://github.com/css-modules/css-modules).
 
 ### disableCSSSourceMap
 
-禁用 CSS 的 SourceMap 生成。
+Disable SourceMap generation for CSS.
 
 ### extraBabelPresets
 
-定义额外的 babel preset 列表，格式为数组。
+Define an additional babel preset list in the form of an array.
 
 ### extraBabelPlugins
 
-定义额外的 babel plugin 列表，格式为数组。
+Define an additional babel plugin list in the form of an array.
 
 ### extraBabelIncludes
 
-定义额外需要做 babel 转换的文件匹配列表，格式为数组。
+Define a list of additional files that need to be babel converted, in the form of an array, and the array item is [webpack#Condition](https://webpack.js.org/configuration/module/#condition).
 
 ### extraPostCSSPlugins
 
-定义额外的 PostCSS 插件，格式为数组。
+Define additional PostCSS plugins in the format of an array.
+
+Such as use the plugin [postcss-px-to-viewport](https://github.com/evrone/postcss-px-to-viewport) .
+
+First install the plugin with `npm install postcss-px-to-viewport --save-dev`, then config the option extraPostCSSPlugins.
+
+```js
+import pxToViewPort from 'postcss-px-to-viewport';
+
+const config = {
+  ...otherConfig,
+  extraPostCSSPlugins: [
+    pxToViewPort({
+      viewportWidth: 375,
+      viewportHeight: 667,
+      unitPrecision: 5,
+      viewportUnit: 'vw',
+      selectorBlackList: [],
+      minPixelValue: 1,
+      mediaQuery: false,
+    }),
+  ],
+}
+```
 
 ### cssModulesExcludes
 
-指定项目目录下的文件不走 css modules，格式为数组，项必须是 css 或 less 文件。
+The files in the specified project directory do not go css modules, the format is an array, and the items must be css or less files.
 
 ### copy
 
-定义需要单纯做复制的文件列表，格式为数组，项的格式参考 [copy-webpack-plugin](https://github.com/webpack-contrib/copy-webpack-plugin) 的配置。
+Define a list of files that need to be copied simply. The format is an array. The format of the item refers to the configuration of [copy-webpack-plugin](https://github.com/webpack-contrib/copy-webpack-plugin).
 
-比如：
+such as:
 
 ```markup
 "copy": [
@@ -247,8 +409,8 @@ chainWebpack(config, { webpack }) {
 
 ### proxy
 
-配置 webpack-dev-server 的 [proxy](https://webpack.js.org/configuration/dev-server/#devserver-proxy) 属性。
-如果要代理请求到其他服务器，可以这样配：
+Configure the [proxy](https://webpack.js.org/configuration/dev-server/#devserver-proxy) property of webpack-dev-server.
+If you want to proxy requests to other servers, you can do this:
 
 ```markup
 "proxy": {
@@ -260,16 +422,16 @@ chainWebpack(config, { webpack }) {
 }
 ```
 
-然后访问?`/api/users`?就能访问到?[http://jsonplaceholder.typicode.com/users](http://jsonplaceholder.typicode.com/users)?的数据。
+Then visit `/api/users` to access the data of [http://jsonplaceholder.typicode.com/users](http://jsonplaceholder.typicode.com/users).
 
 ### sass
 
-配置 [node-sass](https://github.com/sass/node-sass#options) 的选项。注意：使用 sass 时需在项目目录安装 node-sass 和 sass-loader 依赖。
+Configure options for [node-sass](https://github.com/sass/node-sass#options). Note: The node-sass and sass-loader dependencies need to be installed in the project directory when using sass.
 
 ### manifest
 
-配置后会生成 manifest.json，option 传给 [https://www.npmjs.com/package/webpack-manifest-plugin](https://www.npmjs.com/package/webpack-manifest-plugin)。
-比如：
+After configuration, asset-manifest.json will be generated and the option will be passed to [https://www.npmjs.com/package/webpack-manifest-plugin](https://www.npmjs.com/package/webpack-manifest-plugin).
+such as:
 
 ```markup
 "manifest": {
@@ -279,12 +441,68 @@ chainWebpack(config, { webpack }) {
 
 ### ignoreMomentLocale
 
-忽略 moment 的 locale 文件，用于减少尺寸。
+Ignore the locale file for moment to reduce the size.
 
 ### lessLoaderOptions
 
-给 [less-loader](https://github.com/webpack-contrib/less-loader) 的额外配置项。 
+Additional configuration items for [less-loader](https://github.com/webpack-contrib/less-loader).
 
 ### cssLoaderOptions
 
-给 [css-loader](https://github.com/webpack-contrib/css-loader) 的额外配置项。
+Additional configuration items for [css-loader](https://github.com/webpack-contrib/css-loader).Configure the [resolve.alias](https://webpack.js.org/configuration/resolve/#resolve-alias) property of webpack.
+
+### autoprefixer <Badge text="2.4.3+"/>
+
+Configuration for [autoprefixer](https://github.com/postcss/autoprefixer#options) .
+
+- Type: `Object`
+- Default: `{ browserslist, flexbox: 'no-2019' }`
+
+If you want to be compatible with older versions of iOS Safari's flexbox, try to configure `flexbox: true`.
+
+### uglifyJSOptions
+
+Configuration for [uglifyjs-webpack-plugin@2.x](https://github.com/webpack-contrib/uglifyjs-webpack-plugin/tree/master) .
+
+- Type: `Object` | `Function`
+- Default: [af-webpack/src/getConfig/uglifyOptions.js](https://github.com/umijs/umi/blob/master/packages/af-webpack/src/getConfig/uglifyOptions.js#L6)
+
+If the value is `Object`，it will be shallow merged.
+
+e.g.
+
+```js
+export default {
+  uglifyJSOptions: {
+    parallel: false,
+  },
+};
+```
+
+If you want to modify the deep configuration, you can use the `Function` style.
+
+e.g.
+
+```js
+export default {
+  uglifyJSOptions(opts) {
+    opts.uglifyOptions.compress.warning = true;
+    return opts;
+  },
+};
+```
+
+### browserslist <Badge text="deprecated"/>
+
+Configure [browserslist](https://github.com/ai/browserslist) to work with babel-preset-env and autoprefixer.
+
+e.g.
+
+```js
+export default {
+  browserslist: [
+    '> 1%',
+    'last 2 versions',
+  ],
+};
+```

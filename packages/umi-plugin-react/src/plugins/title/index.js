@@ -1,11 +1,20 @@
+import { readFileSync, writeFileSync } from 'fs';
 import { join, relative } from 'path';
 import assert from 'assert';
+import Mustache from 'mustache';
 
 export default (api, option) => {
   const { paths, config } = api;
+  const wrapperPath = join(paths.absTmpDirPath, './TitleWrapper.jsx');
+
+  api.onGenerateFiles(() => {
+    writeTitleWrapper(wrapperPath, option.useLocale, option);
+  });
 
   api.onOptionChange(newOption => {
     option = newOption;
+
+    api.rebuildTmpFiles();
     api.rebuildHTML();
   });
 
@@ -27,13 +36,19 @@ export default (api, option) => {
   api.onPatchRoute(({ route }) => {
     if (option && (!route.routes || !route.routes.length) && route.title) {
       // only open this plugin when option exist
-      route.Routes = [
-        ...(route.Routes || []),
-        relative(paths.cwd, join(__dirname, './TitleWrapper.js')),
-      ];
+      route.Routes = [...(route.Routes || []), relative(paths.cwd, wrapperPath)];
     }
   });
 };
+
+function writeTitleWrapper(targetPath, useLocale, option) {
+  const wrapperTpl = readFileSync(join(__dirname, './template/TitleWrapper.js.tpl'), 'utf-8');
+  const wrapperContent = Mustache.render(wrapperTpl, {
+    useLocale,
+    option,
+  });
+  writeFileSync(targetPath, wrapperContent, 'utf-8');
+}
 
 function parseOption(option) {
   // fill title with parent value or default value
@@ -41,6 +56,7 @@ function parseOption(option) {
   let format = '{parent}{separator}{current}';
   let separator = ' - ';
   if (typeof option === 'object') {
+    // eslint-disable-next-line prefer-destructuring
     defaultTitle = option.defaultTitle;
     assert(defaultTitle, 'defaultTitle in title option is required.');
     format = option.format || format;

@@ -4,11 +4,11 @@
 
 ## Environmental preparation
 
-First you should have [node](https://nodejs.org/en/), and make sure it's version 8 or above.
+First you should have [node](https://nodejs.org/en/), and make sure it's version 8.10 or above.
 
 ```bash
 $ node -v
-0.8.x
+8.1x
 ```
 
 Recommended to use `yarn` to management npm dependency.
@@ -36,7 +36,7 @@ $ umi g page index
 $ umi g page users
 ```
 
-> `umi g` is the alias of `umi generate`, used for generate `component`, `page`, `layout` quickly. And it can be extended in plugins, such as uni-plugin-dva extended `dva:model`, then you can generate dva's model via `umi g dva:model foo`.
+> `umi g` is the alias of `umi generate`, used for generate `component`, `page`, `layout` quickly. And it can be extended in plugins, such as umi-plugin-dva extended `dva:model`, then you can generate dva's model via `umi g dva:model foo`.
 
 Then view the directory with `tree`, (windows users can skip this step)
 
@@ -160,3 +160,34 @@ $ now ./dist
 ```
 
 Then open the url to view it online.
+
+## Test and Inspect
+
+### Test
+
+umi-test based on `jest`
+
+```bash
+$ umi test
+
+Options:
+
+    --coverage                    indicates that test coverage information should be collected and reported in the output
+    --collectCoverageFrom=<glob>  a glob pattern relative to matching the files that coverage info needs to be collected from, e.g, --collectCoverageFrom=src/**/*.js
+    --detectLeaks                 debug memory leaks
+```
+
+### Inspect
+
+```bash
+$ umi inspect
+
+Options:
+
+    --mode                specify env mode (development or production, default is development)
+    --rule <ruleName>     inspect a specific module rule
+    --plugin <pluginName> inspect a specific plugin
+    --rules               list all module rule names
+    --plugins             list all plugin names
+    --verbose             show full function definitions in output
+```

@@ -14,12 +14,8 @@ const isInteractive = process.stdout.isTTY;
 const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 8000;
 const HOST = process.env.HOST || '0.0.0.0';
 const PROTOCOL = process.env.HTTPS ? 'https' : 'http';
-const CERT =
-  process.env.HTTPS && process.env.CERT
-    ? fs.readFileSync(process.env.CERT)
-    : '';
-const KEY =
-  process.env.HTTPS && process.env.KEY ? fs.readFileSync(process.env.KEY) : '';
+const CERT = process.env.HTTPS && process.env.CERT ? fs.readFileSync(process.env.CERT) : '';
+const KEY = process.env.HTTPS && process.env.KEY ? fs.readFileSync(process.env.KEY) : '';
 const noop = () => {};
 
 process.env.NODE_ENV = 'development';
@@ -35,6 +31,7 @@ export default function dev({
   onCompileDone = noop,
   proxy,
   port,
+  history,
   base,
   serverConfig: serverConfigFromOpts = {},
 }) {
@@ -48,30 +45,37 @@ export default function dev({
       const compiler = webpack(webpackConfig);
 
       let isFirstCompile = true;
-      const urls = prepareUrls(PROTOCOL, HOST, port, base);
+      const IS_CI = !!process.env.CI;
+      const SILENT = !!process.env.SILENT;
+      const urls = prepareUrls(PROTOCOL, HOST, port, base, history);
       compiler.hooks.done.tap('af-webpack dev', stats => {
         if (stats.hasErrors()) {
           // make sound
           // ref: https://github.com/JannesMeyer/system-bell-webpack-plugin/blob/bb35caf/SystemBellPlugin.js#L14
-          process.stdout.write('\x07');
+          if (process.env.SYSTEM_BELL !== 'none') {
+            process.stdout.write('\x07');
+          }
           return;
         }
 
         let copied = '';
-        if (isFirstCompile) {
-          require('clipboardy').write(urls.localUrlForBrowser);
-          copied = chalk.dim('(copied to clipboard)');
+        if (isFirstCompile && !IS_CI && !SILENT) {
+          try {
+            require('clipboardy').writeSync(urls.localUrlForBrowser);
+            copied = chalk.dim('(copied to clipboard)');
+          } catch (e) {
+            copied = chalk.red(`(copy to clipboard failed)`);
+          }
+          console.log();
+          console.log(
+            [
+              `  App running at:`,
+              `  - Local:   ${chalk.cyan(urls.localUrlForTerminal)} ${copied}`,
+              `  - Network: ${chalk.cyan(urls.lanUrlForTerminal)}`,
+            ].join('\n'),
+          );
+          console.log();
         }
-
-        console.log();
-        console.log(
-          [
-            `  App running at:`,
-            `  - Local:   ${chalk.cyan(urls.localUrlForTerminal)} ${copied}`,
-            `  - Network: ${chalk.cyan(urls.lanUrlForTerminal)}`,
-          ].join('\n'),
-        );
-        console.log();
 
         onCompileDone({
           isFirstCompile,
@@ -122,6 +126,7 @@ export default function dev({
           });
         },
         ...serverConfigFromOpts,
+        ...(webpackConfig.devServer || {}),
       };
       const server = new WebpackDevServer(compiler, serverConfig);
 
@@ -148,7 +153,7 @@ export default function dev({
         console.log(chalk.cyan('Starting the development server...\n'));
         send({ type: STARTING });
         if (afterServer) {
-          afterServer(server);
+          afterServer(server, port);
         }
       });
     })

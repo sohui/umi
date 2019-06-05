@@ -1,16 +1,20 @@
-import { join } from 'path';
+import { join, relative } from 'path';
 import { writeFileSync, readFileSync } from 'fs';
 import mkdirp from 'mkdirp';
 import chokidar from 'chokidar';
+import assert from 'assert';
 import chalk from 'chalk';
-import debounce from 'lodash.debounce';
+import { debounce, uniq } from 'lodash';
 import Mustache from 'mustache';
+import { winPath, findJS } from 'umi-utils';
 import stripJSONQuote from './routes/stripJSONQuote';
 import routesToJSON from './routes/routesToJSON';
 import importsToStr from './importsToStr';
 import { EXT_LIST } from './constants';
 
 const debug = require('debug')('umi:FilesGenerator');
+
+export const watcherIgnoreRegExp = /(^|[\/\\])(_mock.js$|\..)/;
 
 export default class FilesGenerator {
   constructor(opts) {
@@ -23,6 +27,7 @@ export default class FilesGenerator {
   }
 
   generate() {
+    debug('generate');
     const { paths } = this.service;
     const { absTmpDirPath, tmpDirPath } = paths;
     debug(`mkdir tmp dir: ${tmpDirPath}`);
@@ -33,7 +38,7 @@ export default class FilesGenerator {
 
   createWatcher(path) {
     const watcher = chokidar.watch(path, {
-      ignored: /(^|[\/\\])\../, // ignore .dotfiles
+      ignored: watcherIgnoreRegExp, // ignore .dotfiles and _mock.js
       ignoreInitial: true,
     });
     watcher.on(
@@ -57,6 +62,7 @@ export default class FilesGenerator {
     let pageWatchers = [
       paths.absPagesPath,
       ...EXT_LIST.map(ext => join(paths.absSrcPath, `${layout}/index${ext}`)),
+      ...EXT_LIST.map(ext => join(paths.absSrcPath, `app${ext}`)),
     ];
     if (this.modifyPageWatcher) {
       pageWatchers = this.modifyPageWatcher(pageWatchers);
@@ -89,6 +95,7 @@ export default class FilesGenerator {
 
       this.generateRouterJS();
       this.generateEntry();
+      this.generateHistory();
 
       if (this.hasRebuildError) {
         refreshBrowser();
@@ -110,6 +117,7 @@ export default class FilesGenerator {
     this.service.applyPlugins('onGenerateFiles');
     this.generateRouterJS();
     this.generateEntry();
+    this.generateHistory();
   }
 
   generateEntry() {
@@ -119,8 +127,11 @@ export default class FilesGenerator {
     const entryTpl = readFileSync(paths.defaultEntryTplPath, 'utf-8');
     const initialRender = this.service.applyPlugins('modifyEntryRender', {
       initialValue: `
+  const rootContainer = plugins.apply('rootContainer', {
+    initialValue: React.createElement(require('./router').default),
+  });
   ReactDOM.render(
-    React.createElement(require('./router').default),
+    rootContainer,
     document.getElementById('${this.mountElementId}'),
   );
       `.trim(),
@@ -137,13 +148,25 @@ export default class FilesGenerator {
         };
       });
 
-    const initialHistory = `
-require('umi/_createHistory').default({
-  basename: window.routerBase,
-})
-    `.trim();
-
+    const plugins = this.service
+      .applyPlugins('addRuntimePlugin', {
+        initialValue: [],
+      })
+      .map(plugin => {
+        return winPath(relative(paths.absTmpDirPath, plugin));
+      });
+    if (findJS(paths.absSrcPath, 'app')) {
+      plugins.push('@/app');
+    }
+    const validKeys = this.service.applyPlugins('addRuntimePluginKey', {
+      initialValue: ['patchRoutes', 'render', 'rootContainer', 'modifyRouteProps', 'onRouteChange'],
+    });
+    assert(
+      uniq(validKeys).length === validKeys.length,
+      `Conflict keys found in [${validKeys.join(', ')}]`,
+    );
     const entryContent = Mustache.render(entryTpl, {
+      globalVariables: !this.service.config.disableGlobalVariables,
       code: this.service
         .applyPlugins('addEntryCode', {
           initialValue: [],
@@ -164,13 +187,34 @@ require('umi/_createHistory').default({
           initialValue: [],
         }),
       ).join('\n'),
+      polyfillImports: importsToStr(
+        this.service.applyPlugins('addEntryPolyfillImports', {
+          initialValue: [],
+        }),
+      ).join('\n'),
       moduleBeforeRenderer,
       render: initialRender,
+      plugins,
+      validKeys,
+    });
+    writeFileSync(paths.absLibraryJSPath, `${entryContent.trim()}\n`, 'utf-8');
+  }
+
+  generateHistory() {
+    const { paths } = this.service;
+    const tpl = readFileSync(paths.defaultHistoryTplPath, 'utf-8');
+    const initialHistory = `
+require('umi/_createHistory').default({
+  basename: window.routerBase,
+})
+    `.trim();
+    const content = Mustache.render(tpl, {
+      globalVariables: !this.service.config.disableGlobalVariables,
       history: this.service.applyPlugins('modifyEntryHistory', {
         initialValue: initialHistory,
       }),
     });
-    writeFileSync(paths.absLibraryJSPath, `${entryContent.trim()}\n`, 'utf-8');
+    writeFileSync(join(paths.absTmpDirPath, 'history.js'), `${content.trim()}\n`, 'utf-8');
   }
 
   generateRouterJS() {
@@ -207,6 +251,7 @@ require('umi/_createHistory').default({
 
     const routerContent = this.getRouterContent(rendererWrappers);
     return Mustache.render(routerTpl, {
+      globalVariables: !this.service.config.disableGlobalVariables,
       imports: importsToStr(
         this.service.applyPlugins('addRouterImport', {
           initialValue: rendererWrappers,
@@ -219,12 +264,9 @@ require('umi/_createHistory').default({
       ).join('\n'),
       routes,
       routerContent,
-      RouterRootComponent: this.service.applyPlugins(
-        'modifyRouterRootComponent',
-        {
-          initialValue: 'DefaultRouter',
-        },
-      ),
+      RouterRootComponent: this.service.applyPlugins('modifyRouterRootComponent', {
+        initialValue: 'DefaultRouter',
+      }),
     });
   }
 
@@ -244,7 +286,7 @@ require('umi/_createHistory').default({
 
   getRouterContent(rendererWrappers) {
     const defaultRenderer = `
-    <Router history={window.g_history}>
+    <Router history={history}>
       { renderRoutes(routes, {}) }
     </Router>
     `.trim();

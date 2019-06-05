@@ -1,15 +1,14 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join, dirname, basename, extname } from 'path';
 import globby from 'globby';
 import uniq from 'lodash.uniq';
 import isRoot from 'path-is-root';
-import winPath from 'slash2';
-import { chunkName, findJSFile, optsToArray, endWithSlash } from './utils';
+import { chunkName, findJS, optsToArray, endWithSlash } from 'umi-utils';
 
 export function getModel(cwd, api) {
-  const { config } = api;
+  const { config, winPath } = api;
 
-  const modelJSPath = findJSFile(cwd, 'model');
+  const modelJSPath = findJS(cwd, 'model');
   if (modelJSPath) {
     return [winPath(modelJSPath)];
   }
@@ -26,7 +25,7 @@ export function getModel(cwd, api) {
         !p.endsWith('.test.ts') &&
         !p.endsWith('.test.tsx'),
     )
-    .map(p => winPath(join(cwd, p)));
+    .map(p => api.winPath(join(cwd, p)));
 }
 
 function getModelsWithRoutes(routes, api) {
@@ -44,25 +43,16 @@ function getModelsWithRoutes(routes, api) {
 
 function getPageModels(cwd, api) {
   let models = [];
-  while (!isPagesPath(cwd, api) && !isSrcPath(cwd, api) && !isRoot(cwd)) {
+  while (!isSrcPath(cwd, api) && !isRoot(cwd)) {
     models = models.concat(getModel(cwd, api));
     cwd = dirname(cwd);
   }
   return models;
 }
 
-function isPagesPath(path, api) {
-  const { paths } = api;
-  return (
-    endWithSlash(winPath(path)) === endWithSlash(winPath(paths.absPagesPath))
-  );
-}
-
 function isSrcPath(path, api) {
-  const { paths } = api;
-  return (
-    endWithSlash(winPath(path)) === endWithSlash(winPath(paths.absSrcPath))
-  );
+  const { paths, winPath } = api;
+  return endWithSlash(winPath(path)) === endWithSlash(winPath(paths.absSrcPath));
 }
 
 export function getGlobalModels(api, shouldImportDynamic) {
@@ -78,14 +68,20 @@ export function getGlobalModels(api, shouldImportDynamic) {
 }
 
 export default function(api, opts = {}) {
-  const { paths, cwd, compatDirname } = api;
-  const dvaContainerPath = join(paths.absTmpDirPath, 'DvaContainer.js');
+  const { paths, cwd, compatDirname, winPath } = api;
   const isDev = process.env.NODE_ENV === 'development';
-  const isProduction = process.env.NODE_ENV === 'production';
-  const shouldImportDynamic = isProduction && opts.dynamicImport;
+  const shouldImportDynamic = opts.dynamicImport;
+
+  const dvaDir = compatDirname(
+    'dva/package.json',
+    cwd,
+    dirname(require.resolve('dva/package.json')),
+  );
+  // eslint-disable-next-line import/no-dynamic-require
+  const dvaVersion = require(join(dvaDir, 'package.json')).version;
 
   function getDvaJS() {
-    const dvaJS = findJSFile(paths.absSrcPath, 'dva');
+    const dvaJS = findJS(paths.absSrcPath, 'dva');
     if (dvaJS) {
       return winPath(dvaJS);
     }
@@ -111,16 +107,10 @@ export default function(api, opts = {}) {
   }
 
   function getGlobalModelContent() {
-    return exclude(
-      getGlobalModels(api, shouldImportDynamic),
-      optsToArray(opts.exclude),
-    )
+    return exclude(getGlobalModels(api, shouldImportDynamic), optsToArray(opts.exclude))
       .map(path =>
         `
-    app.model({ namespace: '${basename(
-      path,
-      extname(path),
-    )}', ...(require('${path}').default) });
+    app.model({ namespace: '${basename(path, extname(path))}', ...(require('${path}').default) });
   `.trim(),
       )
       .join('\r\n');
@@ -145,8 +135,8 @@ app.use(require('${winPath(require.resolve('dva-immer'))}').default());
     return ret.join('\r\n');
   }
 
-  api.onGenerateFiles(() => {
-    const tpl = join(__dirname, '../template/DvaContainer.js');
+  function generateInitDva() {
+    const tpl = join(__dirname, '../template/dva.js.tpl');
     let tplContent = readFileSync(tpl, 'utf-8');
     const dvaJS = getDvaJS();
     if (dvaJS) {
@@ -162,12 +152,14 @@ app.use(require('${winPath(require.resolve('dva-immer'))}').default());
       .replace('<%= EnhanceApp %>', '')
       .replace('<%= RegisterPlugins %>', getPluginContent())
       .replace('<%= RegisterModels %>', getGlobalModelContent());
-    writeFileSync(dvaContainerPath, tplContent, 'utf-8');
+    api.writeTmpFile('dva.js', tplContent);
+  }
+
+  api.onGenerateFiles(() => {
+    generateInitDva();
   });
 
-  api.modifyRouterRootComponent(
-    `require('dva/router').routerRedux.ConnectedRouter`,
-  );
+  api.modifyRouterRootComponent(`require('dva/router').routerRedux.ConnectedRouter`);
 
   if (shouldImportDynamic) {
     api.addRouterImport({
@@ -194,7 +186,6 @@ app.use(require('${winPath(require.resolve('dva-immer'))}').default());
       if (opts.dynamicImport.webpackChunkName) {
         extendStr = `/* webpackChunkName: ^${webpackChunkName}^ */`;
       }
-
       let ret = `
 _dvaDynamic({
   <%= MODELS %>
@@ -207,7 +198,7 @@ _dvaDynamic({
         ret = ret.replace(
           '<%= MODELS %>',
           `
-app: window.g_app,
+app: require('@tmp/dva').getApp(),
 models: () => [
   ${models
     .map(
@@ -216,7 +207,10 @@ models: () => [
           opts.dynamicImport.webpackChunkName
             ? `/* webpackChunkName: '${chunkName(paths.cwd, model)}' */`
             : ''
-        }'${model}')`,
+        }'${model}').then(m => { return { namespace: '${basename(
+          model,
+          extname(model),
+        )}',...m.default}})`,
     )
     .join(',\r\n  ')}
 ],
@@ -227,25 +221,8 @@ models: () => [
     });
   }
 
-  api.modifyEntryRender(() => {
-    return `
-const DvaContainer = require('./DvaContainer').default;
-  ReactDOM.render(React.createElement(
-    DvaContainer,
-    null,
-    React.createElement(require('./router').default)
-  ), document.getElementById('root'));
-    `.trim();
-  });
-
-  const dvaDir = compatDirname(
-    'dva/package.json',
-    cwd,
-    dirname(require.resolve('dva/package.json')),
-  );
-
   api.addVersionInfo([
-    `dva@${require(join(dvaDir, 'package.json')).version} (${dvaDir})`,
+    `dva@${dvaVersion} (${dvaDir})`,
     `dva-loading@${require('dva-loading/package').version}`,
     `dva-immer@${require('dva-immer/package').version}`,
     `path-to-regexp@${require('path-to-regexp/package').version}`,
@@ -292,4 +269,14 @@ const DvaContainer = require('./DvaContainer').default;
     Generator: require('./model').default(api),
     resolved: join(__dirname, './model'),
   });
+
+  api.addRuntimePlugin(join(__dirname, './runtime'));
+  api.addRuntimePluginKey('dva');
+
+  api.addEntryCodeAhead(
+    `
+require('@tmp/dva')._onCreate();
+${api.config.disableGlobalVariables ? '' : `window.g_app = require('@tmp/dva').getApp();`}
+  `.trim(),
+  );
 }

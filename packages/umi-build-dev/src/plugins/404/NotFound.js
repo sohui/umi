@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React from 'react';
 import Link from 'umi/link';
 import withRouter from 'umi/withRouter';
@@ -27,7 +28,7 @@ class NotFound extends React.Component {
 
   renderRoutes(routes) {
     return (
-      <ul className={styles.ul}>
+      <ul>
         {routes.map((route, i) => {
           if (!route.path) return null;
           return (
@@ -45,7 +46,7 @@ class NotFound extends React.Component {
     const { location, pagesPath, hasRoutesInConfig } = this.props;
     const jsFile = guessJSFileFromPath(location.pathname);
     return (
-      <div className={styles.wrapper}>
+      <div className={styles['umi-NotFound-wrapper']}>
         <h1>umi development 404 page</h1>
         <p>
           There's not a page yet at <code>{location.pathname}</code>.
@@ -57,13 +58,12 @@ class NotFound extends React.Component {
           </code>{' '}
           {do {
             if (hasRoutesInConfig) {
-              `and configuire the route in config file `;
+              `and configure the route in config file `;
             } else {
               ('');
             }
           }}
-          then this page will automatically refresh to show the new page
-          component you created.
+          then this page will automatically refresh to show the new page component you created.
         </p>
         <h2>Your Routes</h2>
         {do {

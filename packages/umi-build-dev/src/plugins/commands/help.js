@@ -1,6 +1,8 @@
+/* eslint-disable guard-for-in */
+/* eslint-disable prefer-destructuring */
 // Reference: https://github.com/vuejs/vue-cli/blob/dev/packages/%40vue/cli-service/lib/commands/help.js
 import chalk from 'chalk';
-import padEnd from 'string.prototype.padend';
+import { padEnd } from 'lodash';
 import getPadLength from '../../utils/getPadLength';
 
 export default api => {
@@ -26,19 +28,14 @@ export default api => {
   );
 
   function logMainHelp(helpInfo) {
-    console.log(
-      `\n  Usage: ${helpInfo.scriptName} <command> [options]\n` +
-        `\n  Commands:\n`,
-    );
+    console.log(`\n  Usage: ${helpInfo.scriptName} <command> [options]\n`);
+    console.log(`  Commands:\n`);
     const commands = helpInfo.commands;
     const padLength = getPadLength(commands);
     for (const name in commands) {
       const opts = commands[name].opts || {};
       if (opts.hide !== true) {
-        console.log(
-          `    ${chalk.green(padEnd(name, padLength))}${opts.description ||
-            ''}`,
-        );
+        console.log(`    ${chalk.green(padEnd(name, padLength))}${opts.description || ''}`);
       }
     }
     console.log(
@@ -60,9 +57,7 @@ export default api => {
         console.log(`\n  Options:\n`);
         const padLength = getPadLength(opts.options);
         for (const name in opts.options) {
-          console.log(
-            `    ${chalk.green(padEnd(name, padLength))}${opts.options[name]}`,
-          );
+          console.log(`    ${chalk.green(padEnd(name, padLength))}${opts.options[name]}`);
         }
       }
       if (opts.details) {

@@ -23,12 +23,7 @@ function startDevServer(opts = {}) {
 }
 
 function start() {
-  const devServers = [
-    [12341, '../packages/umi/test/normal'],
-    [12342, '../packages/umi/test/hashHistory'],
-    [12351, '../packages/umi-plugin-react/test/normal'],
-    [12352, '../packages/umi-plugin-react/test/with-dva'],
-  ];
+  const devServers = [[12341, '../packages/umi/test/fixtures/dev/normal']];
 
   return Promise.all(
     devServers.map(([port, cwd]) => {

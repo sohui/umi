@@ -4,11 +4,11 @@
 
 ## 环境准备
 
-首先得有 [node](https://nodejs.org/en/)，并确保 node 版本是 8 或以上。（mac 下推荐使用 [nvm](https://github.com/creationix/nvm) 来管理 node 版本）
+首先得有 [node](https://nodejs.org/en/)，并确保 node 版本是 8.10 或以上。（mac 下推荐使用 [nvm](https://github.com/creationix/nvm) 来管理 node 版本）
 
 ```bash
 $ node -v
-0.8.x
+8.1x
 ```
 
 推荐使用 yarn 管理 npm 依赖，并[使用国内源](https://github.com/yiminghe/tyarn)（阿里用户使用内网源）。
@@ -20,7 +20,7 @@ $ npm i yarn tyarn -g
 $ tyarn -v
 
 # 阿里内网源
-$ tnpm i yarn @alipay/yarn -g
+$ tnpm i yarn @ali/yarn -g
 # 后面文档里的 yarn 换成 ayarn
 $ ayarn -v
 ```
@@ -31,6 +31,20 @@ $ ayarn -v
 $ yarn global add umi
 $ umi -v
 2.0.0
+```
+
+> FAQ：如果提示 **umi: command not found**，你需要将 `yarn global bin` 路径配置到环境变量中，方法如下：
+```bash
+# mac 系统:
+$ sudo vi ~/.bash_profile
+# 在 .bash_profile 中添加下面一行：
+export PATH="$PATH:`yarn global bin`"
+
+# windows系统:
+# 获取 global bin 的路径
+$ yarn global bin
+C:\Users\Administrator\AppData\Local\Yarn\bin
+# 复制上面的 global bin 的路径，添加到系统环境变量 PATH。
 ```
 
 ## 脚手架
@@ -172,3 +186,36 @@ $ now ./dist
 ```
 
 然后打开相应的地址就能访问到线上的地址了。
+
+## 测试与配置检查
+
+### 测试
+
+umi 内置了基于 `jest` 的测试工具 umi-test ：
+
+```bash
+$ umi test
+
+Options:
+
+    --coverage                    indicates that test coverage information should be collected and reported in the output
+    --collectCoverageFrom=<glob>  a glob pattern relative to matching the files that coverage info needs to be collected from, e.g, --collectCoverageFrom=src/**/*.js
+    --detectLeaks                 debug memory leaks
+```
+
+### 配置检查
+
+使用 umi inspect 列出配置项的内容用以检查：
+
+```bash
+$ umi inspect
+
+Options:
+
+    --mode                specify env mode (development or production, default is development)
+    --rule <ruleName>     inspect a specific module rule
+    --plugin <pluginName> inspect a specific plugin
+    --rules               list all module rule names
+    --plugins             list all plugin names
+    --verbose             show full function definitions in output
+```

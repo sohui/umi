@@ -1,9 +1,9 @@
 # Examples
 
-## Finished products
+## Finished Products
 
-* [Ant Design Pro](https://github.com/ant-design/ant-design-pro)，Use Ant Design like a Pro! 
-* [Antd Admin](https://github.com/zuiidea/antd-admin)，A admin dashboard application demo built upon Ant Design and Dva.js.
+* [Ant Design Pro](https://github.com/ant-design/ant-design-pro), Use Ant Design like a Pro! 
+* [Antd Admin](https://github.com/zuiidea/antd-admin), An admin dashboard application demo built upon Ant Design and Dva.js.
 
 ## Official
 
@@ -18,12 +18,12 @@
 
 ## Community
 
-::: warning
-The following example uses umi@1.x and has not been upgraded to umi@2.
-:::
+* [umi-antd-mobile](https://github.com/jinjinwa/umi-antd-mobile)，an umi@2.x + dva mobile version example from @jinjinwa
+* [umi-antd-pro](https://github.com/xiaohuoni/umi-antd-pro), an example of umi + antd-pro from @xiaohuni, the official version of antd-pro already switch to umi in 2.0, [migrate](https://pro.ant.design/docs/upgrade-v2-cn)
 
-* [umi-antd-pro](https://github.com/xiaohuoni/umi-antd-pro)，来自 @xiaohuni 的 umi + antd-pro 的例子，antd-pro 官方版本计划在 2.0 之后切换到 umi，还需等待一些时间
-* [dva-umi](https://github.com/xiaohuoni/dva-umi)，来自 @xiaohuni 的 umi + dva 的脚手架
-* [dva-umi-mobile](https://github.com/xiaohuoni/dva-umi-mobile)，来自 @xiaohuni 的 umi + dva 的 mobile 版本脚手架
-* [umi-pro](https://github.com/boxcc/umi-pro)，来自 @boxcc 的 antd-pro 例子
+* [dva-umi](https://github.com/xiaohuoni/dva-umi), umi + dva scaffolding from @xiaohuni
+* [dva-umi-mobile](https://github.com/xiaohuoni/dva-umi-mobile), umi + dva mobile version scaffolding from @xiaohuni
+* [todo-react-umi-dva](https://github.com/saturnism/todo-react-umi-dva), an example Todo app with umi + dva + antd + typescript from @saturnism
+
+
 

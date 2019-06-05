@@ -1,8 +1,7 @@
 import webpack from 'webpack';
-import chalk from 'chalk';
 import rimraf from 'rimraf';
 import assert from 'assert';
-import isPlainObject from 'is-plain-object';
+import { isPlainObject } from 'lodash';
 import { printFileSizesAfterBuild } from 'react-dev-utils/FileSizeReporter';
 
 const debug = require('debug')('af-webpack:build');
@@ -16,23 +15,20 @@ export default function build(opts = {}) {
   assert(webpackConfig, 'webpackConfig should be supplied.');
   assert(isPlainObject(webpackConfig), 'webpackConfig should be plain object.');
 
-  debug(
-    `Clean output path ${webpackConfig.output.path.replace(`${cwd}/`, '')}`,
-  );
+  debug(`Clean output path ${webpackConfig.output.path.replace(`${cwd}/`, '')}`);
   rimraf.sync(webpackConfig.output.path);
 
   debug('build start');
   webpack(webpackConfig, (err, stats) => {
     debug('build done');
 
-    if (err) {
-      console.log();
-      console.log(chalk.red('Failed to compile.\n'));
-      console.log(`${err}\n`);
+    if (err || stats.hasErrors()) {
       if (onFail) {
         onFail({ err, stats });
       }
-      process.exit(1);
+      if (!process.env.UMI_TEST) {
+        process.exit(1);
+      }
     }
 
     console.log('File sizes after gzip:\n');

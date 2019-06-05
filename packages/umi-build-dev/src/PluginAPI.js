@@ -1,9 +1,11 @@
 import debug from 'debug';
 import assert from 'assert';
 import { relative } from 'path';
-import isPlainObject from 'is-plain-object';
+import lodash, { isPlainObject } from 'lodash';
+import Mustache from 'mustache';
 import { winPath, compatDirname, findJS, findCSS } from 'umi-utils';
-import Generator from 'yeoman-generator';
+import signale from 'signale';
+import BasicGenerator from './BasicGenerator';
 import registerBabel, { addBabelRegisterFiles } from './registerBabel';
 
 export default class PluginAPI {
@@ -13,11 +15,14 @@ export default class PluginAPI {
 
     // utils
     this.debug = debug(`umi-plugin: ${id}`);
+    this.log = signale;
     this.winPath = winPath;
+    this._ = lodash;
     this.compatDirname = compatDirname;
     this.findJS = findJS;
     this.findCSS = findCSS;
-    this.Generator = Generator;
+    this.Mustache = Mustache;
+    this.Generator = BasicGenerator;
 
     this.API_TYPE = {
       ADD: Symbol('add'),
@@ -37,13 +42,6 @@ export default class PluginAPI {
   }
 
   _addMethods() {
-    this.registerMethod('chainWebpackConfig', {
-      type: this.API_TYPE.EVENT,
-    });
-    this.registerMethod('_registerConfig', {
-      type: this.API_TYPE.ADD,
-    });
-
     [
       [
         'chainWebpackConfig',
@@ -58,24 +56,29 @@ export default class PluginAPI {
         },
       ],
       'onStart',
+      'onStartAsync',
       'onDevCompileDone',
       'onBuildSuccess',
+      'onBuildSuccessAsync',
       'onBuildFail',
       'addPageWatcher',
       'addEntryCode',
       'addEntryCodeAhead',
       'addEntryImport',
       'addEntryImportAhead',
+      'addEntryPolyfillImports',
       'addRendererWrapperWithComponent',
       'addRendererWrapperWithModule',
       'addRouterImport',
       'addRouterImportAhead',
       'addVersionInfo',
+      'addUIPlugin',
       'modifyAFWebpackOpts',
       'modifyEntryRender',
       'modifyEntryHistory',
       'modifyRouteComponent',
       'modifyRouterRootComponent',
+      'modifyWebpackConfig',
       '_beforeServerWithApp',
       'beforeDevServer',
       '_beforeDevServerAsync',
@@ -92,12 +95,24 @@ export default class PluginAPI {
       'addHTMLScript',
       'addHTMLStyle',
       'addHTMLHeadScript',
+      'addUmiExports',
+      'modifyHTMLChunks',
       'onGenerateFiles',
       'onHTMLRebuild',
       'modifyDefaultConfig',
       '_modifyConfig',
       'modifyHTMLWithAST',
       '_modifyHelpInfo',
+      'addRuntimePlugin',
+      'addRuntimePluginKey',
+      'beforeBlockWriting',
+      '_modifyBlockPackageJSONPath',
+      '_modifyBlockDependencies',
+      '_modifyBlockFile',
+      '_modifyBlockTarget',
+      '_modifyCommand',
+      '_modifyBlockNewRouteConfig',
+      'beforeBuildCompileAsync',
     ].forEach(method => {
       if (Array.isArray(method)) {
         this.registerMethod(...method);
@@ -145,19 +160,9 @@ export default class PluginAPI {
 
   registerGenerator(name, opts) {
     const { generators } = this.service;
-    assert(
-      typeof name === 'string',
-      `name should be supplied with a string, but got ${name}`,
-    );
+    assert(typeof name === 'string', `name should be supplied with a string, but got ${name}`);
     assert(opts && opts.Generator, `opts.Generator should be supplied`);
-    // assert(
-    //   opts.Generator instanceof this.Generator,
-    //   `opts.Generator should be instance of api.Generator`,
-    // );
-    assert(
-      !(name in generators),
-      `Generator ${name} exists, please select another one.`,
-    );
+    assert(!(name in generators), `Generator ${name} exists, please select another one.`);
     generators[name] = opts;
   }
 
@@ -193,20 +198,16 @@ export default class PluginAPI {
       } else if (type === this.API_TYPE.ADD) {
         this.register(name, opts => {
           return (opts.memo || []).concat(
-            typeof args[0] === 'function'
-              ? args[0](opts.memo, opts.args)
-              : args[0],
+            typeof args[0] === 'function' ? args[0](opts.memo, opts.args) : args[0],
           );
         });
       } else if (type === this.API_TYPE.MODIFY) {
         this.register(name, opts => {
-          return typeof args[0] === 'function'
-            ? args[0](opts.memo, opts.args)
-            : args[0];
+          return typeof args[0] === 'function' ? args[0](opts.memo, opts.args) : args[0];
         });
       } else if (type === this.API_TYPE.EVENT) {
         this.register(name, opts => {
-          args[0](opts.args);
+          return args[0](opts.args);
         });
       } else {
         throw new Error(`unexpected api type ${type}`);
@@ -215,11 +216,10 @@ export default class PluginAPI {
   }
 
   addBabelRegister(files) {
-    assert(
-      Array.isArray(files),
-      `files for registerBabel must be Array, but got ${files}`,
-    );
-    addBabelRegisterFiles(files);
+    assert(Array.isArray(files), `files for registerBabel must be Array, but got ${files}`);
+    addBabelRegisterFiles(files, {
+      cwd: this.service.cwd,
+    });
     registerBabel({
       cwd: this.service.cwd,
     });

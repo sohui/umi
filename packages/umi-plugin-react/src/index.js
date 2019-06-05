@@ -1,5 +1,4 @@
-import isPlainObject from 'is-plain-object';
-import isEqual from 'lodash.isequal';
+import { isPlainObject, isEqual } from 'lodash';
 
 function toObject(o) {
   if (!isPlainObject(o)) {
@@ -24,13 +23,19 @@ function diffPlugins(newOption, oldOption) {
 }
 
 export default function(api, option) {
+  const { debug } = api;
+
   api.onOptionChange(newOption => {
+    debug('new option');
+    debug(newOption);
     if (isEqual(getPlugins(newOption), getPlugins(option))) {
       diffPlugins(newOption, option).forEach(key => {
+        debug(`change plugin option: ${key}`);
         api.changePluginOption(getId(key), newOption[key]);
       });
       option = newOption;
     } else {
+      debug('restart');
       api.restart();
     }
   });
@@ -46,6 +51,13 @@ export default function(api, option) {
     dll: () => require('./plugins/dll').default,
     hardSource: () => require('./plugins/hardSource').default,
     pwa: () => require('./plugins/pwa').default,
+
+    // html tags
+    chunks: () => require('./plugins/chunks').default,
+    scripts: () => require('./plugins/scripts').default,
+    headScripts: () => require('./plugins/headScripts').default,
+    links: () => require('./plugins/links').default,
+    metas: () => require('./plugins/metas').default,
 
     // misc
     dva: () => require('./plugins/dva').default,
@@ -67,8 +79,8 @@ export default function(api, option) {
       }
       if (key === 'dva') {
         opts = {
-          ...toObject(opts),
           dynamicImport: option.dynamicImport,
+          ...toObject(opts),
         };
       }
 
